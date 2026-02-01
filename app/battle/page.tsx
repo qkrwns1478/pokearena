@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import BattleArena from '@/components/BattleArena';
 import BattleControls from '@/components/BattleControls';
@@ -15,15 +15,17 @@ export default function BattlePage() {
   const {
     config,
     isPlaying,
+    isPaused,
     addLog,
     updateBattleState,
     addAIReasoning,
     saveBattleLog,
     setPlaying,
+    setPaused,
     resetBattle,
   } = useBattleStore();
 
-  const [orchestrator, setOrchestrator] = useState<BattleOrchestrator | null>(null);
+  const orchestratorRef = useRef<BattleOrchestrator | null>(null);
 
   useEffect(() => {
     if (!selectedP1Team || !selectedP2Team) {
@@ -37,6 +39,7 @@ export default function BattlePage() {
 
     resetBattle();
     setPlaying(true);
+    setPaused(false);
 
     try {
       const p1Team = exportShowdownTeam(selectedP1Team);
@@ -48,7 +51,7 @@ export default function BattlePage() {
         onAIReasoning: (turn, side, reason) => addAIReasoning(turn, side, reason),
       });
 
-      setOrchestrator(orch);
+      orchestratorRef.current = orch;
 
       const winner = await orch.runBattle();
 
@@ -66,20 +69,29 @@ export default function BattlePage() {
 
       saveBattleLog(battleLog);
       setPlaying(false);
+      orchestratorRef.current = null;
 
       alert(`Battle finished! Winner: ${winner}`);
     } catch (error) {
       console.error('Battle error:', error);
       addLog(`Error: ${error}`);
       setPlaying(false);
+      orchestratorRef.current = null;
     }
   };
 
   const handleStopBattle = () => {
-    if (orchestrator) {
-      orchestrator.stop();
+    if (orchestratorRef.current) {
+      orchestratorRef.current.stop();
     }
     setPlaying(false);
+    setPaused(false);
+  };
+
+  const handlePauseBattle = () => {
+    setPaused(!isPaused);
+    // Pause functionality would need more complex implementation
+    // For now, just toggle the state
   };
 
   return (
@@ -109,6 +121,7 @@ export default function BattlePage() {
       <BattleControls
         onStart={handleStartBattle}
         onStop={handleStopBattle}
+        onPause={handlePauseBattle}
         disabled={!selectedP1Team || !selectedP2Team || isPlaying}
       />
     </div>

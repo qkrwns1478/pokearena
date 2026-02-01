@@ -5,11 +5,12 @@ import { useBattleStore } from '@/store/battle-store';
 interface BattleControlsProps {
   onStart: () => void;
   onStop: () => void;
+  onPause: () => void;
   disabled: boolean;
 }
 
-export default function BattleControls({ onStart, onStop, disabled }: BattleControlsProps) {
-  const { isPlaying, isPaused, speed, setPlaying, setPaused, setSpeed } = useBattleStore();
+export default function BattleControls({ onStart, onStop, onPause, disabled }: BattleControlsProps) {
+  const { isPlaying, isPaused, speed, setPaused, setSpeed } = useBattleStore();
 
   return (
     <div className="flex items-center justify-center space-x-4 p-4 border-t border-gray-300">
@@ -24,7 +25,7 @@ export default function BattleControls({ onStart, onStop, disabled }: BattleCont
       ) : (
         <>
           <button
-            onClick={() => setPaused(!isPaused)}
+            onClick={onPause}
             className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
           >
             {isPaused ? 'Resume' : 'Pause'}

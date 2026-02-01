@@ -15,77 +15,32 @@ export function buildAIPrompt(
       index: idx + 1,
       name: m.name,
       type: m.type,
+      category: m.category,
       power: m.basePower,
       accuracy: m.accuracy,
       pp: m.pp,
     })) || [];
 
-  const prompt = `You are a competitive Pokemon battle AI.
-Your Goal: Win the battle.
-Format: ${format}
-Your Role: You are controlling Player ${side.toUpperCase()}.
+  const prompt = `You are competing in ${format}.
 
-Current Situation:
-Turn: ${battleState.turn}
-Weather: ${battleState.field.weather || 'None'}
-Terrain: ${battleState.field.terrain || 'None'}
+YOUR POKEMON:
+Species: ${myPokemon?.species}
+HP: ${myPokemon?.hp}/${myPokemon?.maxHp} (${myPokemon ? Math.round((myPokemon.hp / myPokemon.maxHp) * 100) : 0}%)
+Status: ${myPokemon?.status || 'Healthy'}
+Ability: ${myPokemon?.ability}
 
-Your Active Pokemon:
-- Name: ${myPokemon?.name}
-- HP: ${myPokemon?.hp}/${myPokemon?.maxHp} (${myPokemon ? Math.round((myPokemon.hp / myPokemon.maxHp) * 100) : 0}%)
-- Status: ${myPokemon?.status || 'None'}
-- Ability: ${myPokemon?.ability}
-- Item: ${myPokemon?.item || 'None'}
+OPPONENT:
+Species: ${oppPokemon?.species}
+HP: ${oppPokemon?.hp}/${oppPokemon?.maxHp} (${oppPokemon ? Math.round((oppPokemon.hp / oppPokemon.maxHp) * 100) : 0}%)
+Status: ${oppPokemon?.status || 'Healthy'}
 
-Opponent's Active Pokemon:
-- Name: ${oppPokemon?.name}
-- HP: ${oppPokemon?.hp}/${oppPokemon?.maxHp} (${oppPokemon ? Math.round((oppPokemon.hp / oppPokemon.maxHp) * 100) : 0}%)
-- Status: ${oppPokemon?.status || 'None'}
+YOUR MOVES:
+${availableMoves.map((m) => `${m.index}. ${m.name} (${m.type}, Power: ${m.power})`).join('\n')}
 
-Your Available Moves:
-${availableMoves.map((m) => `${m.index}. ${m.name} (Type: ${m.type}, Power: ${m.power}, Accuracy: ${m.accuracy}%, PP: ${m.pp})`).join('\n')}
-
-Task:
-Analyze the match-up and return the best move in JSON format.
-{
-  "reasoning": "Short explanation (max 1 sentence).",
-  "action": "move",
-  "index": number (1-${availableMoves.length})
-}
-
-IMPORTANT: Only return valid JSON. Index must be between 1 and ${availableMoves.length}.`;
+Choose the best strategic move considering type effectiveness.
+Return JSON: {"reasoning": "brief explanation", "action": "move", "index": <1-${availableMoves.length}>}`;
 
   return prompt;
-}
-
-export function parseAIResponse(response: string, maxMoves: number): AIDecision {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
-    }
-
-    const decision: AIDecision = JSON.parse(jsonMatch[0]);
-
-    // Validation
-    if (!decision.action || !decision.index) {
-      throw new Error('Missing required fields');
-    }
-
-    if (decision.action === 'move' && (decision.index < 1 || decision.index > maxMoves)) {
-      throw new Error('Invalid move index');
-    }
-
-    return decision;
-  } catch (error) {
-    // Fallback: random move
-    console.error('AI response parsing failed:', error);
-    return {
-      reasoning: 'Failed to parse AI response, using random move',
-      action: 'move',
-      index: Math.floor(Math.random() * maxMoves) + 1,
-    };
-  }
 }
 
 export function decisionToCommand(decision: AIDecision): string {
