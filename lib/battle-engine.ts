@@ -1,5 +1,5 @@
-import { Battle, Pokemon, Teams } from '@pkmn/sim';
-import { Dex, TypeName } from '@pkmn/dex';
+import { Battle, Pokemon } from '@pkmn/sim';
+import { Dex } from '@pkmn/dex';
 import { BattleState, PokemonState, FieldState, MoveInfo, AIDecision, IBattleConfig } from './types';
 import { buildAIPrompt, parseAIResponse, decisionToCommand } from './ai-agent';
 
@@ -20,12 +20,13 @@ export class BattleEngineWrapper {
 
     this.battle = new Battle({
       formatid: formatId as any,
-      p1: { name: 'Player 1', team: p1Team },
-      p2: { name: 'Player 2', team: p2Team },
     });
 
-    // Start battle
-    this.battle.start();
+    // Set players with team strings
+    this.battle.setPlayer('p1', { name: 'Player 1', team: p1Team });
+    this.battle.setPlayer('p2', { name: 'Player 2', team: p2Team });
+
+    // Don't call start() - it's called automatically after setPlayer
   }
 
   getBattle(): Battle {
@@ -94,7 +95,6 @@ export class BattleEngineWrapper {
 
   getRequest(side: 'p1' | 'p2'): any {
     const player = side === 'p1' ? this.battle.p1 : this.battle.p2;
-    // @pkmn/sim의 request는 player.request 속성에 저장됨
     return (player as any).request;
   }
 
