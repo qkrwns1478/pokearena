@@ -6,12 +6,16 @@ import TeamManager from '@/components/TeamManager';
 import BattleConfig from '@/components/BattleConfig';
 import { useTeamStore } from '@/store/team-store';
 import { useBattleStore } from '@/store/battle-store';
+import { useInitSampleTeams } from '@/hooks/use-init-sample-teams';
 
 export default function Home() {
   const router = useRouter();
   const { selectedP1Team, selectedP2Team } = useTeamStore();
   const { battleHistory } = useBattleStore();
   const [activeTab, setActiveTab] = useState<'config' | 'teams' | 'history'>('config');
+
+  // Initialize sample teams on first load
+  useInitSampleTeams();
 
   const canStartBattle = selectedP1Team && selectedP2Team;
 

@@ -89,7 +89,7 @@ export default function BattlePage() {
         <div className="container mx-auto px-4 flex justify-between items-center">
           <button
             onClick={() => router.push('/')}
-            className="px-4 py-2 bg-white bg-opacity-20 rounded hover:bg-opacity-30"
+            className="px-4 py-2 bg-white bg-opacity-20 rounded text-black hover:bg-opacity-30"
           >
             ← Back
           </button>

@@ -19,7 +19,15 @@ export const useTeamStore = create<TeamStore>()(
       teams: [],
       selectedP1Team: null,
       selectedP2Team: null,
-      addTeam: (team) => set((state) => ({ teams: [...state.teams, team] })),
+      addTeam: (team) => {
+        // Check if team with same name already exists
+        const exists = get().teams.some(t => t.name === team.name);
+        if (exists) {
+          console.warn(`Team "${team.name}" already exists, skipping...`);
+          return;
+        }
+        set((state) => ({ teams: [...state.teams, team] }));
+      },
       removeTeam: (id) =>
         set((state) => ({
           teams: state.teams.filter((t) => t.id !== id),
