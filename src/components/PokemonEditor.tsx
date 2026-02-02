@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PokemonData } from '@/lib/types';
 import { getPokemonHomeIconUrl } from '@/lib/pokemonSprites';
 import { getAIPokemonRecommendation } from '@/lib/groq';
+import { normalizePokemonName, getAutocompleteSuggestions } from '@/lib/pokemonNames';
 
 interface Props {
   pokemon: PokemonData | null;
@@ -40,6 +41,40 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
 
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiReasoning, setAiReasoning] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+  const handleSpeciesChange = async (value: string) => {
+    setFormData({ ...formData, species: value });
+    
+    if (value.length >= 2) {
+      setIsLoadingSuggestions(true);
+      const newSuggestions = await getAutocompleteSuggestions(value);
+      setSuggestions(newSuggestions);
+      setShowSuggestions(newSuggestions.length > 0);
+      setIsLoadingSuggestions(false);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setFormData({ ...formData, species: suggestion });
+    setShowSuggestions(false);
+  };
+
+  const handleSpeciesBlur = () => {
+    // Normalize on blur
+    setTimeout(() => {
+      if (formData.species) {
+        const normalized = normalizePokemonName(formData.species);
+        setFormData({ ...formData, species: normalized });
+      }
+      setShowSuggestions(false);
+    }, 200);
+  };
 
   const handleAIRecommendation = async () => {
     if (!formData.species.trim()) {
@@ -51,11 +86,13 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
     setAiReasoning('');
 
     try {
-      const recommendation = await getAIPokemonRecommendation(formData.species, 9);
+      const normalizedSpecies = normalizePokemonName(formData.species);
+      const recommendation = await getAIPokemonRecommendation(normalizedSpecies, 9);
       
       if (recommendation) {
         setFormData({
           ...formData,
+          species: normalizedSpecies, // Use normalized name
           ability: recommendation.ability || formData.ability,
           item: recommendation.item || formData.item,
           nature: recommendation.nature || formData.nature,
@@ -78,16 +115,17 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Filter out empty moves
     const filteredMoves = formData.moves.filter(m => m.trim() !== '');
     
     if (!formData.species.trim() || !formData.ability.trim() || filteredMoves.length === 0) {
       alert('포켓몬 이름, 특성, 최소 1개의 기술을 입력해주세요.');
       return;
     }
+    const normalizedSpecies = normalizePokemonName(formData.species);
     
     onSave({
       ...formData,
+      species: normalizedSpecies,
       moves: filteredMoves
     });
   };
@@ -151,18 +189,59 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Left Column */}
             <div className="space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block font-bold text-gray-700 mb-2">포켓몬 이름 *</label>
                 <input
                   type="text"
                   value={formData.species}
-                  onChange={(e) => setFormData({ ...formData, species: e.target.value })}
+                  onChange={(e) => handleSpeciesChange(e.target.value)}
+                  onBlur={handleSpeciesBlur}
+                  onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                  }}
                   className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
                   placeholder="예: Garchomp"
+                  autoComplete="off"
                 />
-                <p className="text-xs text-gray-500 mt-1">영문 이름을 입력한 후 AI 추천을 눌러보세요</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  영문 이름이나 별칭을 입력하세요
+                </p>
+                
+                {/* Autocomplete Suggestions */}
+                {showSuggestions && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {isLoadingSuggestions ? (
+                      <div className="px-4 py-3 text-gray-500 text-center">
+                        <span className="animate-pulse">검색 중...</span>
+                      </div>
+                    ) : suggestions.length > 0 ? (
+                      suggestions.map((suggestion, i) => (
+                        <div
+                          key={i}
+                          onMouseDown={() => selectSuggestion(suggestion)}
+                          className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2 border-b border-gray-100 last:border-0"
+                        >
+                          <img
+                            src={getPokemonHomeIconUrl(suggestion)}
+                            alt={suggestion}
+                            className="w-8 h-8 object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                            }}
+                          />
+                          <span className="font-medium">{suggestion}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-gray-500 text-center">
+                        검색 결과 없음
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* 나머지 Left Column 내용은 동일 */}
               <div className="flex items-center gap-4">
                 <img
                   src={getPokemonHomeIconUrl(formData.species || 'bulbasaur')}
