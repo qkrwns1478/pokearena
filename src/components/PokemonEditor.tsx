@@ -2,9 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { PokemonData } from '@/lib/types';
-import { getPokemonHomeIconUrl } from '@/lib/pokemonSprites';
+import { getPokemonHomeIconUrl, getPokemonFallbackUrl } from '@/lib/pokemonSprites';
 import { getAIPokemonRecommendation } from '@/lib/groq';
 import { normalizePokemonName, getAutocompleteSuggestions } from '@/lib/pokemonNames';
+import { translateKoreanToEnglish, containsKorean, getKoreanSuggestions } from '@/lib/pokemonKoreanNames';
+import {
+  getItemSuggestions,
+  getAbilitySuggestions,
+  getMoveSuggestions,
+  translateItemKoreanToEnglish,
+  translateAbilityKoreanToEnglish,
+  translateMoveKoreanToEnglish
+} from '@/lib/pokemonData';
 
 interface Props {
   pokemon: PokemonData | null;
@@ -41,41 +50,191 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
 
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiReasoning, setAiReasoning] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
+  // Species autocomplete
+  const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
+  const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
+  const [isLoadingSpecies, setIsLoadingSpecies] = useState(false);
+  
+  // Ability autocomplete
+  const [abilitySuggestions, setAbilitySuggestions] = useState<string[]>([]);
+  const [showAbilitySuggestions, setShowAbilitySuggestions] = useState(false);
+  
+  // Item autocomplete
+  const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
+  const [showItemSuggestions, setShowItemSuggestions] = useState(false);
+  
+  // Move autocomplete
+  const [moveSuggestions, setMoveSuggestions] = useState<Array<string[]>>([[], [], [], []]);
+  const [showMoveSuggestions, setShowMoveSuggestions] = useState<boolean[]>([false, false, false, false]);
+  
+  const [koreanDetected, setKoreanDetected] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
+  // Species change handler
   const handleSpeciesChange = async (value: string) => {
     setFormData({ ...formData, species: value });
+    const isKorean = containsKorean(value);
+    setKoreanDetected(isKorean);
     
     if (value.length >= 2) {
-      setIsLoadingSuggestions(true);
-      const newSuggestions = await getAutocompleteSuggestions(value);
-      setSuggestions(newSuggestions);
-      setShowSuggestions(newSuggestions.length > 0);
-      setIsLoadingSuggestions(false);
+      setIsLoadingSpecies(true);
+      if (isKorean) {
+        const koreanSuggs = getKoreanSuggestions(value);
+        const formattedSuggs = koreanSuggs.map(s => `${s.korean} → ${s.english}`);
+        setSpeciesSuggestions(formattedSuggs);
+        setShowSpeciesSuggestions(formattedSuggs.length > 0);
+      } else {
+        const newSuggestions = await getAutocompleteSuggestions(value);
+        setSpeciesSuggestions(newSuggestions);
+        setShowSpeciesSuggestions(newSuggestions.length > 0);
+      }
+      setIsLoadingSpecies(false);
     } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      setSpeciesSuggestions([]);
+      setShowSpeciesSuggestions(false);
     }
   };
 
-  const selectSuggestion = (suggestion: string) => {
-    setFormData({ ...formData, species: suggestion });
-    setShowSuggestions(false);
+  // Ability change handler
+  const handleAbilityChange = (value: string) => {
+    setFormData({ ...formData, ability: value });
+    if (value.length >= 2) {
+      const suggestions = getAbilitySuggestions(value);
+      setAbilitySuggestions(suggestions);
+      setShowAbilitySuggestions(suggestions.length > 0);
+    } else {
+      setAbilitySuggestions([]);
+      setShowAbilitySuggestions(false);
+    }
   };
 
-  const handleSpeciesBlur = () => {
-    // Normalize on blur
-    setTimeout(() => {
+  // Item change handler
+  const handleItemChange = (value: string) => {
+    setFormData({ ...formData, item: value });
+    if (value.length >= 2) {
+      const suggestions = getItemSuggestions(value);
+      setItemSuggestions(suggestions);
+      setShowItemSuggestions(suggestions.length > 0);
+    } else {
+      setItemSuggestions([]);
+      setShowItemSuggestions(false);
+    }
+  };
+
+  // Move change handler
+  const handleMoveChange = (index: number, value: string) => {
+    const newMoves = [...formData.moves];
+    newMoves[index] = value;
+    setFormData({ ...formData, moves: newMoves });
+    
+    if (value.length >= 2) {
+      const suggestions = getMoveSuggestions(value);
+      const newMoveSuggestions = [...moveSuggestions];
+      newMoveSuggestions[index] = suggestions;
+      setMoveSuggestions(newMoveSuggestions);
+      
+      const newShowMoveSuggestions = [...showMoveSuggestions];
+      newShowMoveSuggestions[index] = suggestions.length > 0;
+      setShowMoveSuggestions(newShowMoveSuggestions);
+    } else {
+      const newMoveSuggestions = [...moveSuggestions];
+      newMoveSuggestions[index] = [];
+      setMoveSuggestions(newMoveSuggestions);
+      
+      const newShowMoveSuggestions = [...showMoveSuggestions];
+      newShowMoveSuggestions[index] = false;
+      setShowMoveSuggestions(newShowMoveSuggestions);
+    }
+  };
+
+  // Select suggestion handlers
+  const selectSpeciesSuggestion = (suggestion: string) => {
+    if (suggestion.includes('→')) {
+      const englishName = suggestion.split('→')[1].trim();
+      setFormData({ ...formData, species: englishName });
+    } else {
+      setFormData({ ...formData, species: suggestion });
+    }
+    setShowSpeciesSuggestions(false);
+    setKoreanDetected(false);
+  };
+
+  const selectAbilitySuggestion = (suggestion: string) => {
+    const englishName = suggestion.includes('→') ? suggestion.split('→')[1].trim() : suggestion;
+    setFormData({ ...formData, ability: englishName });
+    setShowAbilitySuggestions(false);
+  };
+
+  const selectItemSuggestion = (suggestion: string) => {
+    const englishName = suggestion.includes('→') ? suggestion.split('→')[1].trim() : suggestion;
+    setFormData({ ...formData, item: englishName });
+    setShowItemSuggestions(false);
+  };
+
+  const selectMoveSuggestion = (index: number, suggestion: string) => {
+    const englishName = suggestion.includes('→') ? suggestion.split('→')[1].trim() : suggestion;
+    const newMoves = [...formData.moves];
+    newMoves[index] = englishName;
+    setFormData({ ...formData, moves: newMoves });
+    
+    const newShowMoveSuggestions = [...showMoveSuggestions];
+    newShowMoveSuggestions[index] = false;
+    setShowMoveSuggestions(newShowMoveSuggestions);
+  };
+
+  // Blur handlers with Korean translation
+  const handleSpeciesBlur = async () => {
+    setTimeout(async () => {
       if (formData.species) {
-        const normalized = normalizePokemonName(formData.species);
+        setIsTranslating(true);
+        let finalName = formData.species;
+        if (containsKorean(formData.species)) {
+          finalName = await translateKoreanToEnglish(formData.species);
+        }
+        const normalized = normalizePokemonName(finalName);
         setFormData({ ...formData, species: normalized });
+        setKoreanDetected(false);
+        setIsTranslating(false);
       }
-      setShowSuggestions(false);
+      setShowSpeciesSuggestions(false);
     }, 200);
   };
 
+  const handleAbilityBlur = () => {
+    setTimeout(() => {
+      if (formData.ability && containsKorean(formData.ability)) {
+        const translated = translateAbilityKoreanToEnglish(formData.ability);
+        setFormData({ ...formData, ability: translated });
+      }
+      setShowAbilitySuggestions(false);
+    }, 200);
+  };
+
+  const handleItemBlur = () => {
+    setTimeout(() => {
+      if (formData.item && containsKorean(formData.item)) {
+        const translated = translateItemKoreanToEnglish(formData.item);
+        setFormData({ ...formData, item: translated });
+      }
+      setShowItemSuggestions(false);
+    }, 200);
+  };
+
+  const handleMoveBlur = (index: number) => {
+    setTimeout(() => {
+      if (formData.moves[index] && containsKorean(formData.moves[index])) {
+        const newMoves = [...formData.moves];
+        newMoves[index] = translateMoveKoreanToEnglish(formData.moves[index]);
+        setFormData({ ...formData, moves: newMoves });
+      }
+      const newShowMoveSuggestions = [...showMoveSuggestions];
+      newShowMoveSuggestions[index] = false;
+      setShowMoveSuggestions(newShowMoveSuggestions);
+    }, 200);
+  };
+
+  // AI recommendation handler
   const handleAIRecommendation = async () => {
     if (!formData.species.trim()) {
       alert('먼저 포켓몬 이름을 입력해주세요.');
@@ -86,13 +245,17 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
     setAiReasoning('');
 
     try {
-      const normalizedSpecies = normalizePokemonName(formData.species);
+      let speciesName = formData.species;
+      if (containsKorean(speciesName)) {
+        speciesName = await translateKoreanToEnglish(speciesName);
+      }
+      const normalizedSpecies = normalizePokemonName(speciesName);
       const recommendation = await getAIPokemonRecommendation(normalizedSpecies, 9);
       
       if (recommendation) {
         setFormData({
           ...formData,
-          species: normalizedSpecies, // Use normalized name
+          species: normalizedSpecies,
           ability: recommendation.ability || formData.ability,
           item: recommendation.item || formData.item,
           nature: recommendation.nature || formData.nature,
@@ -112,7 +275,8 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit handler
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const filteredMoves = formData.moves.filter(m => m.trim() !== '');
@@ -121,7 +285,12 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
       alert('포켓몬 이름, 특성, 최소 1개의 기술을 입력해주세요.');
       return;
     }
-    const normalizedSpecies = normalizePokemonName(formData.species);
+    
+    let speciesName = formData.species;
+    if (containsKorean(speciesName)) {
+      speciesName = await translateKoreanToEnglish(speciesName);
+    }
+    const normalizedSpecies = normalizePokemonName(speciesName);
     
     onSave({
       ...formData,
@@ -144,13 +313,36 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
     });
   };
 
-  const updateMove = (index: number, value: string) => {
-    const newMoves = [...formData.moves];
-    newMoves[index] = value;
-    setFormData({ ...formData, moves: newMoves });
-  };
-
   const evTotal = Object.values(formData.evs).reduce((a, b) => a + b, 0);
+
+  // Autocomplete component
+  const AutocompleteDropdown = ({ 
+    suggestions, 
+    onSelect, 
+    isLoading 
+  }: { 
+    suggestions: string[]; 
+    onSelect: (s: string) => void; 
+    isLoading?: boolean;
+  }) => (
+    <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+      {isLoading ? (
+        <div className="px-4 py-3 text-gray-500 text-center">
+          <span className="animate-pulse">검색 중...</span>
+        </div>
+      ) : suggestions.length > 0 ? (
+        suggestions.map((suggestion, i) => (
+          <div
+            key={i}
+            onMouseDown={() => onSelect(suggestion)}
+            className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 text-sm"
+          >
+            {suggestion}
+          </div>
+        ))
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -186,69 +378,56 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
             </div>
           )}
 
+          {koreanDetected && (
+            <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                🌐 한국어가 감지되었습니다. PokeAPI를 통해 영문으로 자동 변환됩니다.
+              </p>
+            </div>
+          )}
+
+          {isTranslating && (
+            <div className="mb-4 p-3 bg-yellow-50 border-2 border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">🔄 번역 중...</p>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
             {/* Left Column */}
             <div className="space-y-4">
+              {/* Species */}
               <div className="relative">
-                <label className="block font-bold text-gray-700 mb-2">포켓몬 이름 *</label>
+                <label className="block font-bold text-gray-700 mb-2">
+                  포켓몬 이름 * <span className="text-sm font-normal text-gray-500">(한글/영문)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.species}
                   onChange={(e) => handleSpeciesChange(e.target.value)}
                   onBlur={handleSpeciesBlur}
                   onFocus={() => {
-                    if (suggestions.length > 0) setShowSuggestions(true);
+                    if (speciesSuggestions.length > 0) setShowSpeciesSuggestions(true);
                   }}
                   className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="예: Garchomp"
+                  placeholder="예: 이상해씨, Bulbasaur..."
                   autoComplete="off"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  영문 이름이나 별칭을 입력하세요
-                </p>
-                
-                {/* Autocomplete Suggestions */}
-                {showSuggestions && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {isLoadingSuggestions ? (
-                      <div className="px-4 py-3 text-gray-500 text-center">
-                        <span className="animate-pulse">검색 중...</span>
-                      </div>
-                    ) : suggestions.length > 0 ? (
-                      suggestions.map((suggestion, i) => (
-                        <div
-                          key={i}
-                          onMouseDown={() => selectSuggestion(suggestion)}
-                          className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2 border-b border-gray-100 last:border-0"
-                        >
-                          <img
-                            src={getPokemonHomeIconUrl(suggestion)}
-                            alt={suggestion}
-                            className="w-8 h-8 object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
-                            }}
-                          />
-                          <span className="font-medium">{suggestion}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-gray-500 text-center">
-                        검색 결과 없음
-                      </div>
-                    )}
-                  </div>
+                {showSpeciesSuggestions && (
+                  <AutocompleteDropdown
+                    suggestions={speciesSuggestions}
+                    onSelect={selectSpeciesSuggestion}
+                    isLoading={isLoadingSpecies}
+                  />
                 )}
               </div>
 
-              {/* 나머지 Left Column 내용은 동일 */}
               <div className="flex items-center gap-4">
                 <img
                   src={getPokemonHomeIconUrl(formData.species || 'bulbasaur')}
                   alt={formData.species}
                   className="w-20 h-20 object-contain"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
+                    (e.target as HTMLImageElement).src = getPokemonFallbackUrl();
                   }}
                 />
                 <div className="flex-1">
@@ -264,28 +443,57 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-700 mb-2">특성 *</label>
+              {/* Ability */}
+              <div className="relative">
+                <label className="block font-bold text-gray-700 mb-2">
+                  특성 * <span className="text-sm font-normal text-gray-500">(한글/영문)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.ability}
-                  onChange={(e) => setFormData({ ...formData, ability: e.target.value })}
+                  onChange={(e) => handleAbilityChange(e.target.value)}
+                  onBlur={handleAbilityBlur}
+                  onFocus={() => {
+                    if (abilitySuggestions.length > 0) setShowAbilitySuggestions(true);
+                  }}
                   className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="예: Rough Skin"
+                  placeholder="예: 까칠한피부, Rough Skin..."
+                  autoComplete="off"
                 />
+                {showAbilitySuggestions && (
+                  <AutocompleteDropdown
+                    suggestions={abilitySuggestions}
+                    onSelect={selectAbilitySuggestion}
+                  />
+                )}
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-700 mb-2">지닌 물건</label>
+              {/* Item */}
+              <div className="relative">
+                <label className="block font-bold text-gray-700 mb-2">
+                  지닌 물건 <span className="text-sm font-normal text-gray-500">(한글/영문)</span>
+                </label>
                 <input
                   type="text"
                   value={formData.item || ''}
-                  onChange={(e) => setFormData({ ...formData, item: e.target.value })}
+                  onChange={(e) => handleItemChange(e.target.value)}
+                  onBlur={handleItemBlur}
+                  onFocus={() => {
+                    if (itemSuggestions.length > 0) setShowItemSuggestions(true);
+                  }}
                   className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="예: Life Orb"
+                  placeholder="예: 생명의구슬, Life Orb..."
+                  autoComplete="off"
                 />
+                {showItemSuggestions && (
+                  <AutocompleteDropdown
+                    suggestions={itemSuggestions}
+                    onSelect={selectItemSuggestion}
+                  />
+                )}
               </div>
 
+              {/* Nature */}
               <div>
                 <label className="block font-bold text-gray-700 mb-2">성격</label>
                 <select
@@ -299,6 +507,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                 </select>
               </div>
 
+              {/* Tera Type */}
               <div>
                 <label className="block font-bold text-gray-700 mb-2">테라스탈 타입</label>
                 <select
@@ -316,20 +525,40 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
 
             {/* Right Column */}
             <div className="space-y-4">
+              {/* Moves */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">기술 * (최소 1개)</label>
+                <label className="block font-bold text-gray-700 mb-2">
+                  기술 * (최소 1개) <span className="text-sm font-normal text-gray-500">(한글/영문)</span>
+                </label>
                 {[0, 1, 2, 3].map(i => (
-                  <input
-                    key={i}
-                    type="text"
-                    value={formData.moves[i] || ''}
-                    onChange={(e) => updateMove(i, e.target.value)}
-                    className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 mb-2 focus:border-blue-500 focus:outline-none"
-                    placeholder={`기술 ${i + 1}`}
-                  />
+                  <div key={i} className="relative mb-2">
+                    <input
+                      type="text"
+                      value={formData.moves[i] || ''}
+                      onChange={(e) => handleMoveChange(i, e.target.value)}
+                      onBlur={() => handleMoveBlur(i)}
+                      onFocus={() => {
+                        if (moveSuggestions[i].length > 0) {
+                          const newShow = [...showMoveSuggestions];
+                          newShow[i] = true;
+                          setShowMoveSuggestions(newShow);
+                        }
+                      }}
+                      className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                      placeholder={`기술 ${i + 1} (예: 지진, Earthquake)`}
+                      autoComplete="off"
+                    />
+                    {showMoveSuggestions[i] && (
+                      <AutocompleteDropdown
+                        suggestions={moveSuggestions[i]}
+                        onSelect={(s) => selectMoveSuggestion(i, s)}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
 
+              {/* EVs */}
               <div>
                 <label className="block font-bold text-gray-700 mb-2">노력치 (EVs)</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -353,6 +582,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                 </p>
               </div>
 
+              {/* IVs */}
               <div>
                 <label className="block font-bold text-gray-700 mb-2">개체값 (IVs)</label>
                 <div className="grid grid-cols-2 gap-2">
