@@ -1,22 +1,25 @@
 // Cache for Korean-English name mappings
 let koreanNameCache: { [korean: string]: string } = {};
+let englishNameCache: { [english: string]: string } = {};
 let isLoading = false;
 let isCacheReady = false;
 
-// Build Korean name cache from PokeAPI
+// Build Korean name cache from PokeAPI - Load ALL pokemon
 export const buildKoreanNameCache = async (): Promise<void> => {
   if (isCacheReady || isLoading) return;
   
   isLoading = true;
   
   try {
-    // Fetch all pokemon species (limit 2000)
-    const response = await fetch('https://pokeapi.co/api/v2/pokemon-species?limit=2000');
+    // Fetch all pokemon species (no limit)
+    const response = await fetch('https://pokeapi.co/api/v2/pokemon-species?limit=10000');
     const data = await response.json();
     
-    // Fetch Korean names in batches
-    const batchSize = 50;
-    for (let i = 0; i < Math.min(500, data.results.length); i += batchSize) {
+    console.log(`Loading ${data.results.length} pokemon species...`);
+    
+    // Load ALL pokemon in batches
+    const batchSize = 100;
+    for (let i = 0; i < data.results.length; i += batchSize) {
       const batch = data.results.slice(i, i + batchSize);
       
       const promises = batch.map(async (species: any) => {
@@ -36,6 +39,7 @@ export const buildKoreanNameCache = async (): Promise<void> => {
           
           if (koreanName && englishName) {
             koreanNameCache[koreanName.name] = englishName.name;
+            englishNameCache[englishName.name.toLowerCase()] = englishName.name;
           }
         } catch (error) {
           console.error(`Failed to fetch species: ${species.name}`, error);
@@ -44,16 +48,19 @@ export const buildKoreanNameCache = async (): Promise<void> => {
       
       await Promise.all(promises);
       
+      // Progress logging
+      console.log(`Loaded ${Math.min(i + batchSize, data.results.length)} / ${data.results.length} pokemon`);
+      
       // Add delay between batches to avoid rate limiting
-      if (i + batchSize < Math.min(500, data.results.length)) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (i + batchSize < data.results.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
     
     isCacheReady = true;
     isLoading = false;
     
-    console.log(`Korean name cache built: ${Object.keys(koreanNameCache).length} entries`);
+    console.log(`✅ Korean name cache complete: ${Object.keys(koreanNameCache).length} entries`);
   } catch (error) {
     console.error('Failed to build Korean name cache:', error);
     isLoading = false;
@@ -65,7 +72,7 @@ export const translateKoreanToEnglish = async (koreanName: string): Promise<stri
   // Wait for cache to be ready if it's loading
   if (isLoading) {
     let attempts = 0;
-    while (isLoading && attempts < 50) {
+    while (isLoading && attempts < 100) {
       await new Promise(resolve => setTimeout(resolve, 100));
       attempts++;
     }
@@ -82,41 +89,7 @@ export const translateKoreanToEnglish = async (koreanName: string): Promise<stri
     return koreanName;
   }
   
-  // If cache is not ready, try direct API call
-  try {
-    const response = await fetch('https://pokeapi.co/api/v2/pokemon-species?limit=2000');
-    const data = await response.json();
-    
-    // Search through results (limited to first 200 for performance)
-    for (const species of data.results.slice(0, 200)) {
-      try {
-        const speciesResponse = await fetch(species.url);
-        const speciesData = await speciesResponse.json();
-        
-        const koreanNameEntry = speciesData.names.find(
-          (n: any) => n.language.name === 'ko' && n.name === koreanName
-        );
-        
-        if (koreanNameEntry) {
-          const englishName = speciesData.names.find(
-            (n: any) => n.language.name === 'en'
-          );
-          
-          if (englishName) {
-            // Cache it for future use
-            koreanNameCache[koreanName] = englishName.name;
-            return englishName.name;
-          }
-        }
-      } catch (error) {
-        // Continue searching
-      }
-    }
-  } catch (error) {
-    console.error('Korean translation failed:', error);
-  }
-  
-  // Return original if not found
+  // Return original if cache is not ready
   return koreanName;
 };
 
@@ -131,7 +104,7 @@ export const getKoreanSuggestions = (input: string, limit: number = 10): Array<{
     return [];
   }
   
-  // Wait a bit if cache is still loading
+  // Wait if cache is still loading
   if (Object.keys(koreanNameCache).length === 0) {
     return [];
   }

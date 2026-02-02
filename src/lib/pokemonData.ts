@@ -9,30 +9,44 @@ export const fetchAllItems = async (): Promise<Array<{ english: string; korean: 
   if (itemsCache.length > 0) return itemsCache;
 
   try {
-    const response = await fetch('https://pokeapi.co/api/v2/item?limit=2000');
+    const response = await fetch('https://pokeapi.co/api/v2/item?limit=10000');
     const data = await response.json();
 
-    const promises = data.results.slice(0, 300).map(async (item: any) => {
-      try {
-        const itemResponse = await fetch(item.url);
-        const itemData = await itemResponse.json();
+    console.log(`Loading ${data.results.length} items...`);
 
-        const englishName = itemData.names.find((n: any) => n.language.name === 'en');
-        const koreanName = itemData.names.find((n: any) => n.language.name === 'ko');
+    const batchSize = 100;
+    for (let i = 0; i < data.results.length; i += batchSize) {
+      const batch = data.results.slice(i, i + batchSize);
 
-        if (englishName && koreanName) {
-          return { english: englishName.name, korean: koreanName.name };
+      const promises = batch.map(async (item: any) => {
+        try {
+          const itemResponse = await fetch(item.url);
+          const itemData = await itemResponse.json();
+
+          const englishName = itemData.names.find((n: any) => n.language.name === 'en');
+          const koreanName = itemData.names.find((n: any) => n.language.name === 'ko');
+
+          if (englishName && koreanName) {
+            return { english: englishName.name, korean: koreanName.name };
+          }
+        } catch (error) {
+          console.error(`Failed to fetch item: ${item.name}`, error);
         }
-      } catch (error) {
-        console.error(`Failed to fetch item: ${item.name}`, error);
-      }
-      return null;
-    });
+        return null;
+      });
 
-    const results = await Promise.all(promises);
-    itemsCache = results.filter(r => r !== null) as Array<{ english: string; korean: string }>;
+      const results = await Promise.all(promises);
+      itemsCache.push(...(results.filter(r => r !== null) as Array<{ english: string; korean: string }>));
+
+      console.log(`Loaded ${Math.min(i + batchSize, data.results.length)} / ${data.results.length} items`);
+
+      if (i + batchSize < data.results.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
     isCacheReady.items = true;
-    console.log(`Items cache built: ${itemsCache.length} entries`);
+    console.log(`✅ Items cache complete: ${itemsCache.length} entries`);
     return itemsCache;
   } catch (error) {
     console.error('Failed to fetch items:', error);
@@ -45,30 +59,44 @@ export const fetchAllAbilities = async (): Promise<Array<{ english: string; kore
   if (abilitiesCache.length > 0) return abilitiesCache;
 
   try {
-    const response = await fetch('https://pokeapi.co/api/v2/ability?limit=500');
+    const response = await fetch('https://pokeapi.co/api/v2/ability?limit=10000');
     const data = await response.json();
 
-    const promises = data.results.map(async (ability: any) => {
-      try {
-        const abilityResponse = await fetch(ability.url);
-        const abilityData = await abilityResponse.json();
+    console.log(`Loading ${data.results.length} abilities...`);
 
-        const englishName = abilityData.names.find((n: any) => n.language.name === 'en');
-        const koreanName = abilityData.names.find((n: any) => n.language.name === 'ko');
+    const batchSize = 100;
+    for (let i = 0; i < data.results.length; i += batchSize) {
+      const batch = data.results.slice(i, i + batchSize);
 
-        if (englishName && koreanName) {
-          return { english: englishName.name, korean: koreanName.name };
+      const promises = batch.map(async (ability: any) => {
+        try {
+          const abilityResponse = await fetch(ability.url);
+          const abilityData = await abilityResponse.json();
+
+          const englishName = abilityData.names.find((n: any) => n.language.name === 'en');
+          const koreanName = abilityData.names.find((n: any) => n.language.name === 'ko');
+
+          if (englishName && koreanName) {
+            return { english: englishName.name, korean: koreanName.name };
+          }
+        } catch (error) {
+          console.error(`Failed to fetch ability: ${ability.name}`, error);
         }
-      } catch (error) {
-        console.error(`Failed to fetch ability: ${ability.name}`, error);
-      }
-      return null;
-    });
+        return null;
+      });
 
-    const results = await Promise.all(promises);
-    abilitiesCache = results.filter(r => r !== null) as Array<{ english: string; korean: string }>;
+      const results = await Promise.all(promises);
+      abilitiesCache.push(...(results.filter(r => r !== null) as Array<{ english: string; korean: string }>));
+
+      console.log(`Loaded ${Math.min(i + batchSize, data.results.length)} / ${data.results.length} abilities`);
+
+      if (i + batchSize < data.results.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
     isCacheReady.abilities = true;
-    console.log(`Abilities cache built: ${abilitiesCache.length} entries`);
+    console.log(`✅ Abilities cache complete: ${abilitiesCache.length} entries`);
     return abilitiesCache;
   } catch (error) {
     console.error('Failed to fetch abilities:', error);
@@ -81,30 +109,44 @@ export const fetchAllMoves = async (): Promise<Array<{ english: string; korean: 
   if (movesCache.length > 0) return movesCache;
 
   try {
-    const response = await fetch('https://pokeapi.co/api/v2/move?limit=1000');
+    const response = await fetch('https://pokeapi.co/api/v2/move?limit=10000');
     const data = await response.json();
 
-    const promises = data.results.slice(0, 500).map(async (move: any) => {
-      try {
-        const moveResponse = await fetch(move.url);
-        const moveData = await moveResponse.json();
+    console.log(`Loading ${data.results.length} moves...`);
 
-        const englishName = moveData.names.find((n: any) => n.language.name === 'en');
-        const koreanName = moveData.names.find((n: any) => n.language.name === 'ko');
+    const batchSize = 100;
+    for (let i = 0; i < data.results.length; i += batchSize) {
+      const batch = data.results.slice(i, i + batchSize);
 
-        if (englishName && koreanName) {
-          return { english: englishName.name, korean: koreanName.name };
+      const promises = batch.map(async (move: any) => {
+        try {
+          const moveResponse = await fetch(move.url);
+          const moveData = await moveResponse.json();
+
+          const englishName = moveData.names.find((n: any) => n.language.name === 'en');
+          const koreanName = moveData.names.find((n: any) => n.language.name === 'ko');
+
+          if (englishName && koreanName) {
+            return { english: englishName.name, korean: koreanName.name };
+          }
+        } catch (error) {
+          console.error(`Failed to fetch move: ${move.name}`, error);
         }
-      } catch (error) {
-        console.error(`Failed to fetch move: ${move.name}`, error);
-      }
-      return null;
-    });
+        return null;
+      });
 
-    const results = await Promise.all(promises);
-    movesCache = results.filter(r => r !== null) as Array<{ english: string; korean: string }>;
+      const results = await Promise.all(promises);
+      movesCache.push(...(results.filter(r => r !== null) as Array<{ english: string; korean: string }>));
+
+      console.log(`Loaded ${Math.min(i + batchSize, data.results.length)} / ${data.results.length} moves`);
+
+      if (i + batchSize < data.results.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
     isCacheReady.moves = true;
-    console.log(`Moves cache built: ${movesCache.length} entries`);
+    console.log(`✅ Moves cache complete: ${movesCache.length} entries`);
     return movesCache;
   } catch (error) {
     console.error('Failed to fetch moves:', error);
@@ -195,6 +237,15 @@ export const translateAbilityKoreanToEnglish = (korean: string): string => {
 export const translateMoveKoreanToEnglish = (korean: string): string => {
   const move = movesCache.find(m => m.korean === korean);
   return move ? move.english : korean;
+};
+
+// Get cache status
+export const getCacheStatus = () => {
+  return {
+    items: { isReady: isCacheReady.items, size: itemsCache.length },
+    abilities: { isReady: isCacheReady.abilities, size: abilitiesCache.length },
+    moves: { isReady: isCacheReady.moves, size: movesCache.length }
+  };
 };
 
 // Preload caches
