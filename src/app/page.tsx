@@ -1,151 +1,180 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { TeamManager } from '@/lib/teams';
-import { BattleManager } from '@/lib/battle/engine';
+import { useState } from 'react';
+import PartyBuilder from '@/components/PartyBuilder';
 import BattleArena from '@/components/BattleArena';
-import { ITeam } from '@/types';
-import { useBattleStore } from '@/store/useBattleStore';
+import { Party, BattleRules } from '@/lib/types';
 
 export default function Home() {
-  const [teams, setTeams] = useState<ITeam[]>([]);
-  const [p1TeamId, setP1TeamId] = useState<string>('');
-  const [p2TeamId, setP2TeamId] = useState<string>('');
-  const [isBattleStarted, setIsBattleStarted] = useState(false);
-  
-  // BattleManager 인스턴스 유지 (Ref 사용)
-  const battleManagerRef = useRef<BattleManager | null>(null);
-  const { isProcessing, winner } = useBattleStore(); // Store 상태 구독
+  const [step, setStep] = useState<'select' | 'setup' | 'battle'>('select');
+  const [player1Party, setPlayer1Party] = useState<Party | null>(null);
+  const [player2Party, setPlayer2Party] = useState<Party | null>(null);
+  const [rules, setRules] = useState<BattleRules>({
+    generation: 9,
+    format: '6v6',
+    battleType: 'singles',
+    levelCap: 100,
+    allowTerastal: true,
+    allowDynamax: false,
+    allowZMoves: false,
+    allowMega: false
+  });
 
-  const p1Model = 'llama-3.3-70b-versatile'; 
-  const p2Model = 'llama-3.3-70b-versatile';
-
-  useEffect(() => {
-    TeamManager.loadSample();
-    setTeams(TeamManager.getTeams());
-  }, []);
-
-  const handleStartBattle = () => {
-    const p1 = teams.find(t => t.id === p1TeamId);
-    const p2 = teams.find(t => t.id === p2TeamId);
-
-    if (!p1 || !p2) return alert('Please select teams for both players.');
-
-    setIsBattleStarted(true);
-
-    // 매니저 인스턴스 생성 및 시작
-    const manager = new BattleManager(p1.packedTeam, p2.packedTeam, {
-      generation: 9,
-      battleFormat: 'customgame',
-      p1Model,
-      p2Model
-    });
-    
-    battleManagerRef.current = manager;
-    manager.start(); // 초기화 및 Team Preview 진입
-  };
-
-  const handleNextTurn = async () => {
-    if (battleManagerRef.current) {
-      await battleManagerRef.current.nextTurn();
-    }
-  };
-
-  const handleReset = () => {
-    setIsBattleStarted(false);
-    battleManagerRef.current = null;
-  };
-
-  if (isBattleStarted) {
-    return (
-      <main className="min-h-screen bg-gray-950 flex flex-col">
-        {/* 상단 컨트롤 바 */}
-        <div className="p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center">
-          <button 
-            onClick={handleReset}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold"
-          >
-            Stop & Exit
-          </button>
-          
-          {/* [New] Next Turn 버튼 */}
-          {!winner && (
-            <button 
-              onClick={handleNextTurn}
-              disabled={isProcessing}
-              className="px-8 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white rounded-full font-black text-lg shadow-lg flex items-center gap-2"
-            >
-              {isProcessing ? (
-                <>
-                  <span className="animate-spin text-xl">↻</span> Thinking...
-                </>
-              ) : (
-                "NEXT TURN ▶"
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* 배틀 아레나 */}
-        <div className="flex-1 p-4 overflow-hidden">
-          <BattleArena />
-        </div>
-      </main>
-    );
-  }
-
-  // (팀 선택 UI는 기존과 동일)
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-8 flex flex-col items-center">
-      {/* ... 기존 UI 코드 ... */}
-       <h1 className="text-4xl font-bold mb-8 text-yellow-400">PokeArena: AI Battle Simulator</h1>
-      
-      <div className="grid grid-cols-2 gap-12 w-full max-w-4xl mb-12">
-        {/* Player 1 Settings */}
-        <div className="bg-gray-800 p-6 rounded-xl border border-blue-500/30">
-          <h2 className="text-2xl font-bold mb-4 text-blue-400">Player 1</h2>
-          <label className="block text-sm text-gray-400 mb-2">Select Team</label>
-          <select 
-            className="w-full p-3 bg-gray-700 rounded text-white mb-4"
-            onChange={(e) => setP1TeamId(e.target.value)}
-            value={p1TeamId}
-          >
-            <option value="">-- Select Team --</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <div className="text-xs text-gray-500">Model: {p1Model}</div>
-        </div>
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-center mb-8">
+          🎮 PokéArena
+        </h1>
 
-        {/* Player 2 Settings */}
-        <div className="bg-gray-800 p-6 rounded-xl border border-red-500/30">
-          <h2 className="text-2xl font-bold mb-4 text-red-400">Player 2</h2>
-          <label className="block text-sm text-gray-400 mb-2">Select Team</label>
-          <select 
-            className="w-full p-3 bg-gray-700 rounded text-white mb-4"
-            onChange={(e) => setP2TeamId(e.target.value)}
-            value={p2TeamId}
-          >
-            <option value="">-- Select Team --</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <div className="text-xs text-gray-500">Model: {p2Model}</div>
-        </div>
-      </div>
+        {step === 'select' && (
+          <div>
+            <PartyBuilder 
+              onSelectPlayer1={setPlayer1Party}
+              onSelectPlayer2={setPlayer2Party}
+              selectedPlayer1={player1Party}
+              selectedPlayer2={player2Party}
+            />
+            <div className="mt-8 text-center">
+              <button
+                onClick={() => setStep('setup')}
+                disabled={!player1Party || !player2Party}
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                배틀 설정으로 ({player1Party ? '✓' : '✗'} P1, {player2Party ? '✓' : '✗'} P2)
+              </button>
+            </div>
+          </div>
+        )}
 
-      <button
-        onClick={handleStartBattle}
-        disabled={!p1TeamId || !p2TeamId}
-        className="px-12 py-4 bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-black text-xl rounded-full shadow-lg transition-transform transform hover:scale-105"
-      >
-        BATTLE START
-      </button>
+        {step === 'setup' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-bold mb-4">배틀 설정</h2>
+            
+            {/* Selected Teams Summary */}
+            <div className="mb-6 grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded">
+              <div>
+                <h3 className="font-bold text-blue-600">Player 1: {player1Party?.name}</h3>
+                <p className="text-sm text-gray-600">{player1Party?.pokemon.length} 포켓몬</p>
+              </div>
+              <div>
+                <h3 className="font-bold text-red-600">Player 2: {player2Party?.name}</h3>
+                <p className="text-sm text-gray-600">{player2Party?.pokemon.length} 포켓몬</p>
+              </div>
+            </div>
 
-      <div className="mt-12 text-gray-600 text-sm">
-        * No teams? Sample teams are auto-generated on first load.
+            <div className="space-y-4">
+              <div>
+                <label className="block font-medium mb-2">세대</label>
+                <select
+                  value={rules.generation}
+                  onChange={(e) => setRules({ ...rules, generation: Number(e.target.value) as any })}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => (
+                    <option key={gen} value={gen}>Generation {gen}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-2">포맷</label>
+                <select
+                  value={rules.format}
+                  onChange={(e) => setRules({ ...rules, format: e.target.value as any })}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  <option value="1v1">1v1</option>
+                  <option value="3v3">3v3</option>
+                  <option value="6v6">6v6</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-2">배틀 타입</label>
+                <select
+                  value={rules.battleType}
+                  onChange={(e) => setRules({ ...rules, battleType: e.target.value as any })}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  <option value="singles">Singles</option>
+                  <option value="doubles">Doubles</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={rules.allowTerastal}
+                    onChange={(e) => setRules({ ...rules, allowTerastal: e.target.checked })}
+                    className="mr-2"
+                  />
+                  테라스탈 허용
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={rules.allowDynamax}
+                    onChange={(e) => setRules({ ...rules, allowDynamax: e.target.checked })}
+                    className="mr-2"
+                  />
+                  다이맥스 허용
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={rules.allowZMoves}
+                    onChange={(e) => setRules({ ...rules, allowZMoves: e.target.checked })}
+                    className="mr-2"
+                  />
+                  Z기술 허용
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={rules.allowMega}
+                    onChange={(e) => setRules({ ...rules, allowMega: e.target.checked })}
+                    className="mr-2"
+                  />
+                  메가진화 허용
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-4">
+              <button
+                onClick={() => setStep('select')}
+                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              >
+                뒤로
+              </button>
+              <button
+                onClick={() => player1Party && player2Party && setStep('battle')}
+                disabled={!player1Party || !player2Party}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+              >
+                배틀 시작
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'battle' && player1Party && player2Party && (
+          <div>
+            <button
+              onClick={() => setStep('setup')}
+              className="mb-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              ← 설정으로 돌아가기
+            </button>
+            <BattleArena
+              player1Party={player1Party}
+              player2Party={player2Party}
+              rules={rules}
+            />
+          </div>
+        )}
       </div>
     </main>
   );

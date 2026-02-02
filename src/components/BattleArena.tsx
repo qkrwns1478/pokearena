@@ -1,70 +1,150 @@
 'use client';
 
-import { useBattleStore } from '@/store/useBattleStore';
-import { useEffect, useRef } from 'react';
+import { useBattle } from '@/hooks/useBattle';
+import { BattleRules, Party } from '@/lib/types';
+import { useState } from 'react';
 
-export default function BattleArena() {
-  // [FIX] isRunning 삭제 -> isProcessing 추가
-  const { battleLog, currentTurn, isProcessing } = useBattleStore();
-  const logContainerRef = useRef<HTMLDivElement>(null);
+interface Props {
+  player1Party: Party;
+  player2Party: Party;
+  rules: BattleRules;
+}
 
-  const { winner } = battleLog;
+export default function BattleArena({ player1Party, player2Party, rules }: Props) {
+  const { battleState, isProcessing, winner, startBattle, processNextTurn } = useBattle();
+  const [started, setStarted] = useState(false);
 
-  useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [battleLog.logs]);
+  const handleStart = async () => {
+    await startBattle(player1Party, player2Party, rules);
+    setStarted(true);
+  };
 
-  // 현재 턴의 Reasoning 찾기
-  const activeReasoning = battleLog.aiReasoning.find(r => r.turn === currentTurn) || 
-                          battleLog.aiReasoning[battleLog.aiReasoning.length - 1];
+  if (!started) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <button
+          onClick={handleStart}
+          className="px-8 py-4 bg-green-600 text-white text-xl font-bold rounded-lg hover:bg-green-700"
+        >
+          배틀 시작!
+        </button>
+      </div>
+    );
+  }
+
+  if (!battleState) {
+    return <div className="text-center p-8">로딩 중...</div>;
+  }
 
   return (
-    <div className="flex flex-col h-screen max-h-[800px] p-4 gap-4 bg-gray-900 text-white">
-      <div className="flex justify-between items-center p-4 bg-gray-800 rounded-lg border border-gray-700">
-        <div className="text-xl font-bold text-blue-400">Player 1 (AI)</div>
-        <div className="text-2xl font-black text-yellow-500">
-          {winner ? `WINNER: ${winner.toUpperCase()}` : `TURN ${currentTurn}`}
-        </div>
-        <div className="text-xl font-bold text-red-400">Player 2 (AI)</div>
-      </div>
-
-      <div className="flex flex-1 gap-4 overflow-hidden">
-        
-        {/* P1 Reasoning */}
-        <div className="w-1/4 p-4 bg-gray-800 rounded-lg overflow-y-auto border border-blue-900/50">
-          <h3 className="text-sm font-bold text-gray-400 mb-2">P1 Reasoning</h3>
-          <div className="text-sm text-blue-200 italic whitespace-pre-wrap">
-            {activeReasoning?.p1Reason || <span className="text-gray-600">- Waiting -</span>}
-          </div>
-        </div>
-
-        {/* Log */}
-        <div 
-          ref={logContainerRef}
-          className="flex-1 p-4 bg-black rounded-lg overflow-y-auto font-mono text-sm border border-gray-700 shadow-inner"
-        >
-          {battleLog.logs.map((log, i) => (
-            <div key={i} className="mb-1 border-b border-gray-900 pb-1 break-words">
-              {log}
+    <div className="space-y-6">
+      {/* Battle Field */}
+      <div className="grid grid-cols-2 gap-8 p-8 bg-gradient-to-b from-blue-100 to-green-100 rounded-lg">
+        {/* Player 1 */}
+        <div className="text-center">
+          <h3 className="font-bold text-lg mb-2">Player 1</h3>
+          {battleState.player1.active ? (
+            <div className="bg-white p-4 rounded-lg shadow">
+              <h4 className="text-xl font-bold">{battleState.player1.active.species}</h4>
+              <p className="text-sm text-gray-600">{battleState.player1.active.ability}</p>
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-4">
+                  <div
+                    className="bg-green-600 h-4 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.max(0, (battleState.player1.active as any).currentHP || 100)}%`
+                    }}
+                  ></div>
+                </div>
+                <p className="text-xs mt-1">
+                  HP: {((battleState.player1.active as any).currentHP || 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                {battleState.player1.active.moves.join(' | ')}
+              </div>
             </div>
-          ))}
-          {/* [FIX] isRunning -> isProcessing으로 변경 */}
-          {isProcessing && (
-            <div className="animate-pulse text-yellow-500 mt-2 font-bold">
-              AI is thinking & calculating...
+          ) : (
+            <div className="bg-gray-300 p-4 rounded-lg text-red-600 font-bold">
+              기절 - 교체 필요
             </div>
           )}
-        </div>
-
-        {/* P2 Reasoning */}
-        <div className="w-1/4 p-4 bg-gray-800 rounded-lg overflow-y-auto border border-red-900/50">
-          <h3 className="text-sm font-bold text-gray-400 mb-2">P2 Reasoning</h3>
-          <div className="text-sm text-red-200 italic whitespace-pre-wrap">
-            {activeReasoning?.p2Reason || <span className="text-gray-600">- Waiting -</span>}
+          <div className="mt-4 text-sm">
+            <p>남은 포켓몬: {battleState.player1.party.length - battleState.player1.fainted.length}</p>
+            <p className="text-xs text-gray-600">기절: {battleState.player1.fainted.length}</p>
           </div>
         </div>
+
+        {/* Player 2 */}
+        <div className="text-center">
+          <h3 className="font-bold text-lg mb-2">Player 2</h3>
+          {battleState.player2.active ? (
+            <div className="bg-white p-4 rounded-lg shadow">
+              <h4 className="text-xl font-bold">{battleState.player2.active.species}</h4>
+              <p className="text-sm text-gray-600">{battleState.player2.active.ability}</p>
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-4">
+                  <div
+                    className="bg-green-600 h-4 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.max(0, (battleState.player2.active as any).currentHP || 100)}%`
+                    }}
+                  ></div>
+                </div>
+                <p className="text-xs mt-1">
+                  HP: {((battleState.player2.active as any).currentHP || 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                {battleState.player2.active.moves.join(' | ')}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gray-300 p-4 rounded-lg text-red-600 font-bold">
+              기절 - 교체 필요
+            </div>
+          )}
+          <div className="mt-4 text-sm">
+            <p>남은 포켓몬: {battleState.player2.party.length - battleState.player2.fainted.length}</p>
+            <p className="text-xs text-gray-600">기절: {battleState.player2.fainted.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Turn Info */}
+      <div className="text-center">
+        <p className="text-2xl font-bold">Turn {battleState.turn}</p>
+        {isProcessing && (
+          <p className="text-sm text-blue-600 mt-2">AI가 생각 중...</p>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex justify-center">
+        {winner ? (
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-green-600 mb-4">
+              Player {winner} 승리!
+            </h2>
+          </div>
+        ) : (
+          <button
+            onClick={processNextTurn}
+            disabled={isProcessing}
+            className="px-8 py-4 bg-blue-600 text-white text-xl font-bold rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {isProcessing ? '처리 중...' : 'Next Turn'}
+          </button>
+        )}
+      </div>
+
+      {/* Battle Log */}
+      <div className="bg-gray-900 text-green-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
+        {battleState.log.slice(-15).map((entry, i) => (
+          <div key={i} className="mb-1">
+            <span className="text-gray-500">[Turn {entry.turn}]</span> {entry.message}
+          </div>
+        ))}
       </div>
     </div>
   );
