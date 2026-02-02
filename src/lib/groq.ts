@@ -20,8 +20,14 @@ export const getAIDecision = async (request: AIRequest): Promise<AIAction> => {
             "type": "move" or "switch",
             "moveIndex": 0-3 (if type is "move"),
             "switchTo": 0-5 (if type is "switch", index of party member),
+            "useTerastal": true/false (optional, use Terastallization),
+            "useDynamax": true/false (optional, use Dynamax),
+            "useZMove": true/false (optional, use Z-Move),
+            "useMega": true/false (optional, use Mega Evolution),
             "reasoning": "brief explanation of your decision"
-          }`
+          }
+          
+          Consider using special mechanics (Tera, Dynamax, Z-Move, Mega) at key moments for maximum impact.`
         },
         {
           role: 'user',
@@ -30,7 +36,7 @@ export const getAIDecision = async (request: AIRequest): Promise<AIAction> => {
       ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 600,
       response_format: { type: 'json_object' }
     });
 
@@ -59,24 +65,46 @@ const buildPrompt = (request: AIRequest): string => {
     opponentActivePokemon,
     battleState,
     rules,
-    recentLog
+    recentLog,
+    availableGimmicks
   } = request;
+
+  const gimmicksStatus = [
+    availableGimmicks.canTerastallize && `Terastallize to ${myActivePokemon.teraType}-type`,
+    availableGimmicks.canDynamax && `Dynamax (3 turns of power)`,
+    availableGimmicks.canUseZMove && `Z-Move (one-time powerful attack)`,
+    availableGimmicks.canMegaEvolve && `Mega Evolution (permanent stat boost)`
+  ].filter(Boolean).join(', ');
+
+  const hasGimmicksAvailable = Object.values(availableGimmicks).some(v => v);
 
   return `
 BATTLE STATE (Turn ${battleState.turn})
 -----------------------------------------
 
 YOUR ACTIVE POKÉMON:
-${formatPokemon(myActivePokemon)}
+${formatPokemon(myActivePokemon)} [HP: ${myActivePokemon.currentHP?.toFixed(1) || 100}%]
+${myActivePokemon.hasTerastallized ? `[TERASTALLIZED: ${myActivePokemon.teraType}-type]` : ''}
+${myActivePokemon.hasDynamaxed ? '[DYNAMAXED]' : ''}
+${myActivePokemon.hasMegaEvolved ? '[MEGA EVOLVED]' : ''}
 
 OPPONENT'S ACTIVE POKÉMON:
-${opponentActivePokemon ? formatPokemon(opponentActivePokemon) : 'Unknown'}
+${opponentActivePokemon ? `${formatPokemon(opponentActivePokemon)} [HP: ${opponentActivePokemon.currentHP?.toFixed(1) || 100}%]` : 'Unknown'}
+${opponentActivePokemon?.hasTerastallized ? `[TERASTALLIZED: ${opponentActivePokemon.teraType}-type]` : ''}
 
 YOUR AVAILABLE PARTY:
-${myParty.map((p, i) => `${i}. ${formatPokemon(p)}`).join('\n')}
+${myParty.map((p, i) => `${i}. ${formatPokemon(p)} [HP: ${(p.currentHP || 100).toFixed(1)}%]`).join('\n')}
 
 YOUR FAINTED: ${battleState.myFainted.join(', ') || 'None'}
 OPPONENT FAINTED: ${battleState.opponentFainted.join(', ') || 'None'}
+
+AVAILABLE SPECIAL MECHANICS:
+${hasGimmicksAvailable ? gimmicksStatus : 'No gimmicks available (limit reached or none enabled)'}
+
+GIMMICK USAGE:
+- Total gimmick limit per player: ${rules.gimmickUsageLimit}
+- You have used: Check your battle state
+- You can only use ONE gimmick per turn if available
 
 RECENT BATTLE LOG:
 ${recentLog.slice(-5).map(l => `Turn ${l.turn}: ${l.message}`).join('\n')}
@@ -90,11 +118,12 @@ RULES:
 DECISION REQUIRED:
 Analyze the situation and decide whether to use a move or switch Pokémon.
 Consider type matchups, HP, stats, and strategic positioning.
+${hasGimmicksAvailable ? 'You can activate ONE special mechanic this turn if strategically beneficial. Use them wisely as you have limited uses!' : ''}
 `;
 };
 
 const formatPokemon = (pokemon: Partial<PokemonData>): string => {
-  return `${pokemon.species} (${pokemon.ability}) - Moves: ${pokemon.moves?.join(', ')}`;
+  return `${pokemon.species} Lv.${pokemon.level || 100} (${pokemon.ability}) - Moves: ${pokemon.moves?.join(', ')}`;
 };
 
 export const getInitialPokemonChoice = async (

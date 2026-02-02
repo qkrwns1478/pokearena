@@ -14,21 +14,29 @@ export const useBattle = () => {
   const startBattle = useCallback(async (
     player1Party: Party,
     player2Party: Party,
+    player1Entry: number[],
+    player2Entry: number[],
     battleRules: BattleRules
   ) => {
     setIsProcessing(true);
     setRules(battleRules);
 
     try {
-      // Get initial Pokémon choices from AI
+      // 엔트리에서 선택된 포켓몬들
+      const p1EntryPokemon = player1Entry.map(i => player1Party.pokemon[i]);
+      const p2EntryPokemon = player2Entry.map(i => player2Party.pokemon[i]);
+
+      // Get initial Pokémon choices from AI (엔트리 내에서)
       const [lead1, lead2] = await Promise.all([
-        getInitialPokemonChoice(player1Party.pokemon, player2Party.pokemon, battleRules),
-        getInitialPokemonChoice(player2Party.pokemon, player1Party.pokemon, battleRules)
+        getInitialPokemonChoice(p1EntryPokemon, p2EntryPokemon, battleRules),
+        getInitialPokemonChoice(p2EntryPokemon, p1EntryPokemon, battleRules)
       ]);
 
       const initialState = initializeBattle(
         player1Party.pokemon,
         player2Party.pokemon,
+        player1Entry,
+        player2Entry,
         lead1,
         lead2,
         battleRules
@@ -63,12 +71,11 @@ export const useBattle = () => {
       // Handle Player 1
       if (!battleState.player1.active) {
         // Player 1 needs to switch - get AI decision
-        const availablePokemon = battleState.player1.party
+        const availablePokemon = battleState.player1.entry
           .map((p, i) => ({ pokemon: p, index: i }))
           .filter(({ pokemon }) => !battleState.player1.fainted.includes(pokemon.id));
         
         if (availablePokemon.length > 0) {
-          // Ask AI which Pokemon to switch to
           const switchIndex = await getAISwitchChoice(
             1,
             battleState,
@@ -82,7 +89,7 @@ export const useBattle = () => {
         action1 = await getAIDecision({
           playerNumber: 1,
           myActivePokemon: battleState.player1.active,
-          myParty: battleState.player1.party,
+          myParty: battleState.player1.entry, // 엔트리만 전달
           opponentActivePokemon: battleState.player2.active,
           opponentVisibleInfo: battleState.player2.active ? [battleState.player2.active] : [],
           battleState: {
@@ -92,19 +99,31 @@ export const useBattle = () => {
             field: battleState.field
           },
           rules,
-          recentLog: battleState.log.slice(-10)
+          recentLog: battleState.log.slice(-10),
+          availableGimmicks: {
+            canTerastallize: rules.allowTerastal && 
+                              !battleState.player1.active.hasTerastallized && 
+                              battleState.player1.gimmicksUsed < rules.gimmickUsageLimit,
+            canDynamax: rules.allowDynamax && 
+                        !battleState.player1.active.hasDynamaxed && 
+                        battleState.player1.gimmicksUsed < rules.gimmickUsageLimit,
+            canUseZMove: rules.allowZMoves && 
+                         !battleState.player1.active.hasUsedZMove && 
+                         battleState.player1.gimmicksUsed < rules.gimmickUsageLimit,
+            canMegaEvolve: rules.allowMega && 
+                           !battleState.player1.active.hasMegaEvolved && 
+                           battleState.player1.gimmicksUsed < rules.gimmickUsageLimit
+          }
         });
       }
 
       // Handle Player 2
       if (!battleState.player2.active) {
-        // Player 2 needs to switch - get AI decision
-        const availablePokemon = battleState.player2.party
+        const availablePokemon = battleState.player2.entry
           .map((p, i) => ({ pokemon: p, index: i }))
           .filter(({ pokemon }) => !battleState.player2.fainted.includes(pokemon.id));
         
         if (availablePokemon.length > 0) {
-          // Ask AI which Pokemon to switch to
           const switchIndex = await getAISwitchChoice(
             2,
             battleState,
@@ -114,11 +133,10 @@ export const useBattle = () => {
           action2 = { type: 'switch', switchTo: switchIndex };
         }
       } else {
-        // Normal turn - get AI decision for move or switch
         action2 = await getAIDecision({
           playerNumber: 2,
           myActivePokemon: battleState.player2.active,
-          myParty: battleState.player2.party,
+          myParty: battleState.player2.entry, // 엔트리만 전달
           opponentActivePokemon: battleState.player1.active,
           opponentVisibleInfo: battleState.player1.active ? [battleState.player1.active] : [],
           battleState: {
@@ -128,7 +146,21 @@ export const useBattle = () => {
             field: battleState.field
           },
           rules,
-          recentLog: battleState.log.slice(-10)
+          recentLog: battleState.log.slice(-10),
+          availableGimmicks: {
+            canTerastallize: rules.allowTerastal && 
+                              !battleState.player2.active.hasTerastallized && 
+                              battleState.player2.gimmicksUsed < rules.gimmickUsageLimit,
+            canDynamax: rules.allowDynamax && 
+                        !battleState.player2.active.hasDynamaxed && 
+                        battleState.player2.gimmicksUsed < rules.gimmickUsageLimit,
+            canUseZMove: rules.allowZMoves && 
+                         !battleState.player2.active.hasUsedZMove && 
+                         battleState.player2.gimmicksUsed < rules.gimmickUsageLimit,
+            canMegaEvolve: rules.allowMega && 
+                           !battleState.player2.active.hasMegaEvolved && 
+                           battleState.player2.gimmicksUsed < rules.gimmickUsageLimit
+          }
         });
       }
 
@@ -173,10 +205,10 @@ const getAISwitchChoice = async (
 Your Pokémon has fainted! You must choose which Pokémon to send out next.
 
 AVAILABLE POKÉMON (choose by index):
-${availableIndices.map(i => `${i}. ${player.party[i].species} (${player.party[i].ability}) - ${player.party[i].moves.join(', ')}`).join('\n')}
+${availableIndices.map(i => `${i}. ${player.entry[i].species} Lv.${player.entry[i].level} (${player.entry[i].ability}) - HP: ${player.entry[i].currentHP?.toFixed(1)}%`).join('\n')}
 
 OPPONENT'S ACTIVE POKÉMON:
-${opponent.active ? `${opponent.active.species} (${opponent.active.ability})` : 'None'}
+${opponent.active ? `${opponent.active.species} (${opponent.active.ability}) - HP: ${opponent.active.currentHP?.toFixed(1)}%` : 'None'}
 
 YOUR FAINTED: ${player.fainted.length}
 OPPONENT FAINTED: ${opponent.fainted.length}
@@ -211,7 +243,6 @@ Respond in JSON: {"index": number, "reasoning": "brief explanation"}
     const response = JSON.parse(completion.choices[0]?.message?.content || '{}');
     const chosenIndex = response.index;
 
-    // Validate the chosen index
     if (availableIndices.includes(chosenIndex)) {
       return chosenIndex;
     }
@@ -219,6 +250,5 @@ Respond in JSON: {"index": number, "reasoning": "brief explanation"}
     console.error('AI switch choice error:', error);
   }
 
-  // Fallback: return first available Pokemon
   return availableIndices[0];
 };

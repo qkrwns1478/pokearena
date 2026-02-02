@@ -27,6 +27,12 @@ export interface PokemonData {
   };
   moves: string[];
   teraType?: string;
+  // 배틀 중 상태
+  currentHP?: number;
+  hasTerastallized?: boolean;
+  hasDynamaxed?: boolean;
+  hasUsedZMove?: boolean;
+  hasMegaEvolved?: boolean;
 }
 
 export interface Party {
@@ -39,26 +45,31 @@ export interface BattleRules {
   generation: Generation;
   format: '1v1' | '3v3' | '6v6';
   battleType: 'singles' | 'doubles';
-  levelCap: number;
+  levelCap: 50 | 100;
   allowTerastal: boolean;
   allowDynamax: boolean;
   allowZMoves: boolean;
   allowMega: boolean;
+  gimmickUsageLimit: number;
 }
 
 export interface BattleState {
   turn: number;
   player1: {
-    party: PokemonData[];
+    party: PokemonData[]; // 전체 파티
+    entry: PokemonData[]; // 실제 출전 엔트리
     active: PokemonData | null;
     fainted: string[];
+    gimmicksUsed: number;
   };
   player2: {
     party: PokemonData[];
+    entry: PokemonData[];
     active: PokemonData | null;
     fainted: string[];
+    gimmicksUsed: number;
   };
-  field: any; // Smogon Field
+  field: any;
   log: BattleLogEntry[];
 }
 
@@ -76,6 +87,11 @@ export interface AIAction {
   moveIndex?: number;
   switchTo?: number;
   reasoning?: string;
+  // 추가: 특수 기믹 사용
+  useTerastal?: boolean;
+  useDynamax?: boolean;
+  useZMove?: boolean;
+  useMega?: boolean;
 }
 
 export interface AIRequest {
@@ -92,4 +108,11 @@ export interface AIRequest {
   };
   rules: BattleRules;
   recentLog: BattleLogEntry[];
+  // 추가: 사용 가능한 특수 기믹
+  availableGimmicks: {
+    canTerastallize: boolean;
+    canDynamax: boolean;
+    canUseZMove: boolean;
+    canMegaEvolve: boolean;
+  };
 }
