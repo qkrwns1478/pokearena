@@ -171,3 +171,83 @@ Respond in JSON: {"index": number, "reasoning": "explanation"}
     return 0;
   }
 };
+
+export const getAIEntryRecommendation = async (
+  myParty: PokemonData[],
+  opponentParty: PokemonData[],
+  rules: BattleRules,
+  entryCount: number
+): Promise<{ indices: number[], reasoning: string }> => {
+  const prompt = `
+You are a competitive Pokémon team builder. Analyze both teams and recommend the best ${entryCount} Pokémon to bring into battle.
+
+MY FULL PARTY (Choose ${entryCount} from these):
+${myParty.map((p, i) => `${i}. ${p.species} Lv.${p.level} @ ${p.item || 'No Item'} | Ability: ${p.ability} | Moves: ${p.moves.join(', ')}`).join('\n')}
+
+OPPONENT'S PARTY (Known Info):
+${opponentParty.map((p, i) => `${i}. ${p.species} @ ${p.item || 'No Item'}`).join('\n')}
+
+BATTLE FORMAT: ${rules.format} ${rules.battleType}
+GENERATION: ${rules.generation}
+LEVEL CAP: ${rules.levelCap}
+
+SPECIAL MECHANICS ALLOWED:
+- Terastal: ${rules.allowTerastal ? 'Yes' : 'No'}
+- Dynamax: ${rules.allowDynamax ? 'Yes' : 'No'}
+- Z-Moves: ${rules.allowZMoves ? 'Yes' : 'No'}
+- Mega Evolution: ${rules.allowMega ? 'Yes' : 'No'}
+
+TASK:
+Analyze type matchups, team synergy, and strategic coverage. Select ${entryCount} Pokémon that:
+1. Cover each other's weaknesses
+2. Have good matchups against opponent's team
+3. Provide offensive and defensive balance
+4. Can utilize available special mechanics effectively
+
+Respond in JSON format:
+{
+  "indices": [array of ${entryCount} indices from 0-${myParty.length - 1}],
+  "reasoning": "brief explanation of your team selection strategy"
+}
+`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert competitive Pokémon team builder with deep knowledge of type matchups, team synergy, and battle strategy.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.8,
+      max_tokens: 600,
+      response_format: { type: 'json_object' }
+    });
+
+    const response = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    
+    // Validate response
+    if (Array.isArray(response.indices) && 
+        response.indices.length === entryCount &&
+        response.indices.every((idx: number) => idx >= 0 && idx < myParty.length)) {
+      return {
+        indices: response.indices,
+        reasoning: response.reasoning || 'AI recommended this team composition.'
+      };
+    }
+    
+    throw new Error('Invalid AI response');
+  } catch (error) {
+    console.error('AI entry recommendation error:', error);
+    // Fallback: select first N Pokemon
+    return {
+      indices: Array.from({ length: entryCount }, (_, i) => i),
+      reasoning: 'Error occurred. Using first available Pokémon.'
+    };
+  }
+};

@@ -202,15 +202,19 @@ export default function Home() {
             {entryStep === 'p1' ? (
               <TeamSelection
                 party={player1Party}
+                opponentParty={player2Party}
                 playerNumber={1}
                 maxSelection={entryCount}
+                rules={rules}
                 onConfirm={handlePlayer1EntryConfirm}
               />
             ) : (
               <TeamSelection
                 party={player2Party}
+                opponentParty={player1Party}
                 playerNumber={2}
                 maxSelection={entryCount}
+                rules={rules}
                 onConfirm={handlePlayer2EntryConfirm}
               />
             )}
