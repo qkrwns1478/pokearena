@@ -22,9 +22,31 @@ interface Props {
 }
 
 const NATURES = [
-  'Adamant', 'Bashful', 'Bold', 'Brave', 'Calm', 'Careful', 'Docile', 'Gentle',
-  'Hardy', 'Hasty', 'Impish', 'Jolly', 'Lax', 'Lonely', 'Mild', 'Modest',
-  'Naive', 'Naughty', 'Quiet', 'Quirky', 'Rash', 'Relaxed', 'Sassy', 'Serious', 'Timid'
+  { name: 'Adamant', korean: '고집', plus: 'Atk', minus: 'SpA' },
+  { name: 'Bashful', korean: '수줍음', plus: null, minus: null },
+  { name: 'Bold', korean: '대담', plus: 'Def', minus: 'Atk' },
+  { name: 'Brave', korean: '용감', plus: 'Atk', minus: 'Spe' },
+  { name: 'Calm', korean: '차분', plus: 'SpD', minus: 'Atk' },
+  { name: 'Careful', korean: '신중', plus: 'SpD', minus: 'SpA' },
+  { name: 'Docile', korean: '온순', plus: null, minus: null },
+  { name: 'Gentle', korean: '얌전', plus: 'SpD', minus: 'Def' },
+  { name: 'Hardy', korean: '노력', plus: null, minus: null },
+  { name: 'Hasty', korean: '성급', plus: 'Spe', minus: 'Def' },
+  { name: 'Impish', korean: '장난꾸러기', plus: 'Def', minus: 'SpA' },
+  { name: 'Jolly', korean: '명랑', plus: 'Spe', minus: 'SpA' },
+  { name: 'Lax', korean: '무사태평', plus: 'Def', minus: 'SpD' },
+  { name: 'Lonely', korean: '외로움', plus: 'Atk', minus: 'Def' },
+  { name: 'Mild', korean: '의젓', plus: 'SpA', minus: 'Def' },
+  { name: 'Modest', korean: '조심', plus: 'SpA', minus: 'Atk' },
+  { name: 'Naive', korean: '천진난만', plus: 'Spe', minus: 'SpD' },
+  { name: 'Naughty', korean: '개구쟁이', plus: 'Atk', minus: 'SpD' },
+  { name: 'Quiet', korean: '냉정', plus: 'SpA', minus: 'Spe' },
+  { name: 'Quirky', korean: '변덕', plus: null, minus: null },
+  { name: 'Rash', korean: '덤벙', plus: 'SpA', minus: 'SpD' },
+  { name: 'Relaxed', korean: '무던', plus: 'Def', minus: 'Spe' },
+  { name: 'Sassy', korean: '건방', plus: 'SpD', minus: 'Spe' },
+  { name: 'Serious', korean: '성실', plus: null, minus: null },
+  { name: 'Timid', korean: '겁쟁이', plus: 'Spe', minus: 'Atk' }
 ];
 
 const TERA_TYPES = [
@@ -51,27 +73,55 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiReasoning, setAiReasoning] = useState('');
   
-  // Species autocomplete
   const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
   const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
   const [isLoadingSpecies, setIsLoadingSpecies] = useState(false);
   
-  // Ability autocomplete
   const [abilitySuggestions, setAbilitySuggestions] = useState<string[]>([]);
   const [showAbilitySuggestions, setShowAbilitySuggestions] = useState(false);
   
-  // Item autocomplete
   const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
   const [showItemSuggestions, setShowItemSuggestions] = useState(false);
   
-  // Move autocomplete
   const [moveSuggestions, setMoveSuggestions] = useState<Array<string[]>>([[], [], [], []]);
   const [showMoveSuggestions, setShowMoveSuggestions] = useState<boolean[]>([false, false, false, false]);
   
   const [koreanDetected, setKoreanDetected] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
 
-  // Species change handler
+  // Helper function to format nature display
+  const formatNatureDisplay = (nature: typeof NATURES[0]) => {
+    if (nature.plus && nature.minus) {
+      return `${nature.name} (${nature.korean}) [+${nature.plus}, -${nature.minus}]`;
+    } else {
+      return `${nature.name} (${nature.korean}) [중립]`;
+    }
+  };
+
+  // Get color for nature based on current EVs
+  const getNatureColor = (nature: typeof NATURES[0]) => {
+    if (!nature.plus || !nature.minus) return 'text-gray-700';
+    
+    const statMap: { [key: string]: keyof typeof formData.evs } = {
+      'Atk': 'atk',
+      'Def': 'def',
+      'SpA': 'spa',
+      'SpD': 'spd',
+      'Spe': 'spe'
+    };
+    
+    const plusStat = statMap[nature.plus];
+    const minusStat = statMap[nature.minus];
+    
+    if (plusStat && formData.evs[plusStat] > 0) {
+      return 'text-green-700 font-semibold';
+    } else if (minusStat && formData.evs[minusStat] > 0) {
+      return 'text-red-700';
+    }
+    
+    return 'text-gray-700';
+  };
+
   const handleSpeciesChange = async (value: string) => {
     setFormData({ ...formData, species: value });
     const isKorean = containsKorean(value);
@@ -348,6 +398,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8">
         <form onSubmit={handleSubmit} className="p-6">
+          {/* 헤더 */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">
               {pokemon ? '포켓몬 수정' : '새 포켓몬 추가'}
@@ -372,6 +423,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
             </button>
           </div>
 
+          {/* 알림 메시지들 */}
           {aiReasoning && (
             <div className="mb-4 p-3 bg-purple-50 border-2 border-purple-200 rounded-lg">
               <p className="text-sm text-gray-700">{aiReasoning}</p>
@@ -395,7 +447,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Left Column */}
             <div className="space-y-4">
-              {/* Species */}
+              {/* Species - 기존과 동일 */}
               <div className="relative">
                 <label className="block font-bold text-gray-700 mb-2">
                   포켓몬 이름 * <span className="text-sm font-normal text-gray-500">(한글/영문)</span>
@@ -421,6 +473,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                 )}
               </div>
 
+              {/* Pokemon Image + Level */}
               <div className="flex items-center gap-4">
                 <img
                   src={getPokemonHomeIconUrl(formData.species || 'bulbasaur')}
@@ -457,7 +510,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                     if (abilitySuggestions.length > 0) setShowAbilitySuggestions(true);
                   }}
                   className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
-                  placeholder="예: 까칠한피부, Rough Skin..."
+                  placeholder="예: 거친피부, Rough Skin..."
                   autoComplete="off"
                 />
                 {showAbilitySuggestions && (
@@ -499,12 +552,21 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                 <select
                   value={formData.nature}
                   onChange={(e) => setFormData({ ...formData, nature: e.target.value })}
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm"
                 >
                   {NATURES.map(nature => (
-                    <option key={nature} value={nature}>{nature}</option>
+                    <option 
+                      key={nature.name} 
+                      value={nature.name}
+                      className={getNatureColor(nature)}
+                    >
+                      {formatNatureDisplay(nature)}
+                    </option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  EV 투자한 스탯에 맞는 성격이 초록색으로 표시됩니다
+                </p>
               </div>
 
               {/* Tera Type */}
@@ -604,6 +666,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
             </div>
           </div>
 
+          {/* Buttons */}
           <div className="mt-6 flex gap-3">
             <button
               type="button"
