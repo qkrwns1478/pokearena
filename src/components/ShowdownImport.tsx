@@ -105,7 +105,7 @@ Ability: Infiltrator
                             alt={p.species}
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                              (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                             }}
                           />
                           <div>

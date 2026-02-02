@@ -125,7 +125,7 @@ export default function TeamSelection({
                 alt={p.species}
                 className="w-10 h-10 object-contain"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                  (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                 }}
               />
               <div className="flex-1 min-w-0">
@@ -160,7 +160,7 @@ export default function TeamSelection({
                   alt={p.species}
                   className="w-20 h-20 mx-auto object-contain mb-2"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                    (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                   }}
                 />
                 {isSelected && (

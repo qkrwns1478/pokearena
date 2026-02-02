@@ -226,7 +226,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                             alt={suggestion}
                             className="w-8 h-8 object-contain"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                              (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                             }}
                           />
                           <span className="font-medium">{suggestion}</span>
@@ -248,7 +248,7 @@ export default function PokemonEditor({ pokemon, onSave, onCancel }: Props) {
                   alt={formData.species}
                   className="w-20 h-20 object-contain"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                    (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                   }}
                 />
                 <div className="flex-1">

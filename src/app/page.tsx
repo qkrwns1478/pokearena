@@ -241,7 +241,7 @@ export default function Home() {
                           alt={p.species}
                           className="w-12 h-12 object-contain bg-white rounded-lg p-1 shadow"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                            (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                           }}
                         />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
@@ -266,7 +266,7 @@ export default function Home() {
                           alt={p.species}
                           className="w-12 h-12 object-contain bg-white rounded-lg p-1 shadow"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png';
+                            (e.target as HTMLImageElement).src = 'https://play.pokemonshowdown.com/sprites/gen3/0.png';
                           }}
                         />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">

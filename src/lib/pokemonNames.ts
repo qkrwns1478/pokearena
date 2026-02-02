@@ -9,7 +9,6 @@ export const fetchAllPokemonNames = async (): Promise<string[]> => {
   }
 
   if (isLoading) {
-    // Wait for current loading to complete
     while (isLoading) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -19,17 +18,23 @@ export const fetchAllPokemonNames = async (): Promise<string[]> => {
   isLoading = true;
 
   try {
-    // Fetch all pokemon (limit 2000 to get all current pokemon)
     const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000');
     const data = await response.json();
     
-    // Extract and format names
+    // Extract and format names - keep spaces for readability
     const names = data.results.map((p: any) => {
-      // Convert kebab-case to Title Case
+      // Convert kebab-case to proper format
       return p.name
         .split('-')
-        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join('-');
+        .map((word: string, index: number) => {
+          // Special handling for forms
+          if (word === 'alola' || word === 'galar' || word === 'hisui' || 
+              word === 'therian' || word === 'origin' || word === 'mega') {
+            return word.charAt(0).toUpperCase() + word.slice(1);
+          }
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' '); // Use space instead of dash for display
     });
 
     pokemonNamesCache = names;
@@ -38,7 +43,7 @@ export const fetchAllPokemonNames = async (): Promise<string[]> => {
   } catch (error) {
     console.error('Failed to fetch pokemon names:', error);
     isLoading = false;
-    return fallbackPokemonNames; // Use fallback
+    return fallbackPokemonNames;
   }
 };
 
@@ -150,7 +155,8 @@ export const normalizePokemonName = (input: string): string => {
   // Check aliases first
   const aliasKey = normalized.replace(/[\s\-]/g, '');
   if (pokemonAliases[aliasKey]) {
-    return pokemonAliases[aliasKey];
+    // Convert dash to space for display
+    return pokemonAliases[aliasKey].replace(/-/g, ' ');
   }
   
   // Check if it matches a known pokemon name (from cache if available)
@@ -207,3 +213,12 @@ export const getAutocompleteSuggestions = async (input: string, limit: number = 
 if (typeof window !== 'undefined') {
   fetchAllPokemonNames().catch(console.error);
 }
+
+// Convert display name to Showdown format for API calls
+export const toShowdownFormat = (displayName: string): string => {
+  return displayName
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[:.]/g, '')
+    .replace(/'/g, '');
+};
