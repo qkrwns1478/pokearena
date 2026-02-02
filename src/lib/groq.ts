@@ -251,3 +251,81 @@ Respond in JSON format:
     };
   }
 };
+
+export const getAIPokemonRecommendation = async (
+  species: string,
+  generation: number = 9
+): Promise<Partial<PokemonData> | null> => {
+  const prompt = `
+You are a competitive Pokémon team builder. Generate optimal competitive build for ${species}.
+
+POKEMON: ${species}
+GENERATION: ${generation}
+
+Provide:
+1. Best competitive ability for this Pokémon
+2. Optimal held item
+3. Recommended nature
+4. Optimal EV spread (must total 510 or less, multiples of 4)
+5. Four competitive moves
+6. Recommended Tera Type (if Gen 9)
+
+Respond in JSON format:
+{
+  "ability": "ability name",
+  "item": "item name",
+  "nature": "nature name",
+  "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+  },
+  "moves": ["move1", "move2", "move3", "move4"],
+  "teraType": "type name or empty string",
+  "reasoning": "brief explanation of the build"
+}
+`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert competitive Pokémon team builder with deep knowledge of optimal builds, movesets, and strategies.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: 800,
+      response_format: { type: 'json_object' }
+    });
+
+    const response = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    
+    // Validate EVs total
+    const evTotal = Object.values(response.evs || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+    if (evTotal > 510) {
+      console.warn('AI returned invalid EV total, using default');
+      response.evs = { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 };
+    }
+
+    return {
+      ability: response.ability || 'Unknown',
+      item: response.item || '',
+      nature: response.nature || 'Serious',
+      evs: response.evs || { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 },
+      moves: (response.moves || []).slice(0, 4),
+      teraType: response.teraType || ''
+    };
+  } catch (error) {
+    console.error('AI Pokemon recommendation error:', error);
+    return null;
+  }
+};
